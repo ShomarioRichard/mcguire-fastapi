@@ -1,0 +1,19 @@
+{
+  "name": "mcguire-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "bcrypt": "^5.1.0",
+    "multer": "^1.4.5-lts.1",
+    "@prisma/client": "^4.15.0"
+  },
+  "devDependencies": {
+    "prisma": "^4.15.0"
+  }
+}

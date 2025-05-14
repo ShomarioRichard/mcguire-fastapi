@@ -60,15 +60,18 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/convert-step', upload.single('file'), (req, res) => {
   const inputPath = req.file.path;
   const outputPath = `${inputPath}.json`;
-  const cliPath = path.resolve('./mcguire-step-cli/build/mcguire_step_cli');
 
-  execFile(cliPath, [inputPath, outputPath], (error, stdout, stderr) => {
+  // We installed the CLI into /usr/local/bin, so it's on the PATH
+  const cliPath = 'mcguire_step_cli';
+
+  execFile(cliPath, [ inputPath, outputPath ], (error, stdout, stderr) => {
     if (error) {
-      console.error('❌ CLI error:', stderr);
+      console.error('❌ CLI error:', stderr || error.message);
       return res.status(500).send('STEP conversion failed.');
     }
 
     fs.readFile(outputPath, 'utf8', (err, data) => {
+      // clean up temp files
       fs.unlinkSync(inputPath);
       fs.unlinkSync(outputPath);
 

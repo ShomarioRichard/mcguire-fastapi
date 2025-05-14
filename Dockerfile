@@ -29,6 +29,12 @@ RUN git clone --branch V7_9_0 \
     cd / && rm -rf /tmp/occt
 
 ############################################################
+#  Configure dynamic linker for OCCT libs
+############################################################
+RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/occt.conf && \
+    ldconfig
+
+############################################################
 #  Copy only the things the Node app needs
 ############################################################
 WORKDIR /app

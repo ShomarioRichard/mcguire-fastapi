@@ -29,9 +29,9 @@ int main(int argc, char** argv) {
 
     try {
         if (ext == ".step" || ext == ".stp") {
-            convertStepToJson(inputPath, outputPath);
+            convertStepToJson(inputPath, outputPath);  // uses OpenCASCADE
         } else if (ext == ".stl") {
-            convertStlToJson(inputPath, outputPath);
+            convertStlToJson(inputPath, outputPath);   // uses custom STL parser
         } else {
             std::cerr << "❌ Unsupported file extension: " << ext << std::endl;
             return 2;
@@ -44,3 +44,4 @@ int main(int argc, char** argv) {
         return 3;
     }
 }
+

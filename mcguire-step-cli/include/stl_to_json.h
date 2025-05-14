@@ -1,5 +1,3 @@
-// include/stl_to_json.h
-
 #pragma once
 #include <string>
 

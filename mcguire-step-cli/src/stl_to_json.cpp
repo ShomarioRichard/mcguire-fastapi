@@ -1,66 +1,104 @@
 #include "stl_to_json.h"
-#include <StlAPI_Reader.hxx>
-#include <TopoDS_Shape.hxx>
-#include <BRepMesh_IncrementalMesh.hxx>
-#include <TopExp_Explorer.hxx>
-#include <TopoDS_Face.hxx>
-#include <BRep_Tool.hxx>
-#include <Poly_Triangulation.hxx>
-#include <TopoDS.hxx>
-#include <TopLoc_Location.hxx>
-#include <gp_Pnt.hxx>
-#include <nlohmann/json.hpp>
 #include <fstream>
+#include <sstream>
+#include <iostream>
+#include <vector>
+#include <array>
 #include <map>
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-void convertStlToJson(const std::string& inputPath, const std::string& outputPath) {
-    TopoDS_Shape shape;
-    StlAPI_Reader reader;
-    if (!reader.Read(shape, inputPath.c_str()))
-        throw std::runtime_error("Failed to read STL file");
+struct Vec3 {
+    float x, y, z;
 
-    BRepMesh_IncrementalMesh(shape, 0.1);
+    bool operator<(const Vec3& other) const {
+        return std::tie(x, y, z) < std::tie(other.x, other.y, other.z);
+    }
+};
+
+bool isAsciiStl(const std::string& path) {
+    std::ifstream in(path);
+    std::string line;
+    std::getline(in, line);
+    return line.find("solid") != std::string::npos;
+}
+
+void parseAsciiStl(std::ifstream& in, std::vector<Vec3>& vertices, std::vector<std::array<int, 3>>& faces) {
+    std::map<Vec3, int> vertexMap;
+    std::string line;
+    while (std::getline(in, line)) {
+        std::istringstream iss(line);
+        std::string keyword;
+        iss >> keyword;
+
+        if (keyword == "vertex") {
+            Vec3 v;
+            iss >> v.x >> v.y >> v.z;
+            auto [it, inserted] = vertexMap.emplace(v, vertexMap.size());
+            if (inserted) {
+                vertices.push_back(v);
+            }
+        }
+
+        if (line.find("endloop") != std::string::npos) {
+            int n = vertices.size();
+            faces.push_back({n - 3, n - 2, n - 1});
+        }
+    }
+}
+
+void parseBinaryStl(std::ifstream& in, std::vector<Vec3>& vertices, std::vector<std::array<int, 3>>& faces) {
+    char header[80];
+    in.read(header, 80);
+
+    uint32_t numTriangles;
+    in.read(reinterpret_cast<char*>(&numTriangles), 4);
+
+    std::map<Vec3, int> vertexMap;
+    for (uint32_t i = 0; i < numTriangles; ++i) {
+        in.ignore(12); // skip normal vector
+        std::array<int, 3> faceIdx;
+
+        for (int j = 0; j < 3; ++j) {
+            Vec3 v;
+            in.read(reinterpret_cast<char*>(&v), sizeof(Vec3));
+            auto [it, inserted] = vertexMap.emplace(v, vertexMap.size());
+            if (inserted) {
+                vertices.push_back(v);
+            }
+            faceIdx[j] = vertexMap[v];
+        }
+
+        faces.push_back(faceIdx);
+        in.ignore(2); // skip attribute byte count
+    }
+}
+
+void convertStlToJson(const std::string& inputPath, const std::string& outputPath) {
+    std::vector<Vec3> vertices;
+    std::vector<std::array<int, 3>> faces;
+
+    std::ifstream in(inputPath, std::ios::binary);
+    if (!in) throw std::runtime_error("Could not open STL file");
+
+    if (isAsciiStl(inputPath)) {
+        in.close();
+        in.open(inputPath); // reopen as text
+        parseAsciiStl(in, vertices, faces);
+    } else {
+        parseBinaryStl(in, vertices, faces);
+    }
 
     json j;
     j["vertices"] = json::array();
     j["faces"] = json::array();
 
-    std::map<gp_Pnt, int, bool(*)(const gp_Pnt&, const gp_Pnt&)> vertexMap(
-        [](const gp_Pnt& a, const gp_Pnt& b) {
-            return a.X() < b.X() || (a.X() == b.X() && a.Y() < b.Y()) || (a.X() == b.X() && a.Y() == b.Y() && a.Z() < b.Z());
-        }
-    );
+    for (const auto& v : vertices)
+        j["vertices"].push_back({v.x, v.y, v.z});
 
-    for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
-        TopoDS_Face face = TopoDS::Face(exp.Current());
-        TopLoc_Location loc;
-        Handle(Poly_Triangulation) triangulation = BRep_Tool::Triangulation(face, loc);
-        if (triangulation.IsNull()) continue;
-
-        int nbNodes = triangulation->NbNodes();
-        int nbTriangles = triangulation->NbTriangles();
-
-        std::vector<int> indexMap(nbNodes + 1);
-
-        for (int i = 1; i <= nbNodes; ++i) {
-            gp_Pnt pt = triangulation->Node(i).Transformed(loc.Transformation());
-            if (vertexMap.find(pt) == vertexMap.end()) {
-                int id = vertexMap.size();
-                vertexMap[pt] = id;
-                j["vertices"].push_back({ pt.X(), pt.Y(), pt.Z() });
-            }
-            indexMap[i] = vertexMap[pt];
-        }
-
-        for (int i = 1; i <= nbTriangles; ++i) {
-            Poly_Triangle t = triangulation->Triangle(i);
-            int n1, n2, n3;
-            t.Get(n1, n2, n3);
-            j["faces"].push_back({ indexMap[n1], indexMap[n2], indexMap[n3] });
-        }
-    }
+    for (const auto& f : faces)
+        j["faces"].push_back({f[0], f[1], f[2]});
 
     std::ofstream out(outputPath);
     out << j.dump(2);

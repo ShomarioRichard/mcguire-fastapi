@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "step_to_json.h"
 #include "stl_to_json.h"
+#include "obj_to_json.h"
 
 std::string toLower(const std::string& str) {
     std::string lowerStr = str;
@@ -29,9 +30,11 @@ int main(int argc, char** argv) {
 
     try {
         if (ext == ".step" || ext == ".stp") {
-            convertStepToJson(inputPath, outputPath);  // uses OpenCASCADE
+            convertStepToJson(inputPath, outputPath);
         } else if (ext == ".stl") {
-            convertStlToJson(inputPath, outputPath);   // uses custom STL parser
+            convertStlToJson(inputPath, outputPath);
+        } else if (ext == ".obj") {
+            convertObjToJson(inputPath, outputPath);  // NEW
         } else {
             std::cerr << "❌ Unsupported file extension: " << ext << std::endl;
             return 2;
@@ -44,4 +47,3 @@ int main(int argc, char** argv) {
         return 3;
     }
 }
-

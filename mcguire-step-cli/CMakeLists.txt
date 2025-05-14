@@ -30,6 +30,7 @@ add_executable(mcguire_step_cli
   main.cpp
   src/step_to_json.cpp
   src/stl_to_json.cpp
+  src/obj_to_json.cpp
 )
 
 # ---------------------------------------------------------------------------

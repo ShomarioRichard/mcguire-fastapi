@@ -2,29 +2,28 @@ cmake_minimum_required(VERSION 3.16)
 project(mcguire_step_cli LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
-# Global flags
+# Global settings
 # ---------------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---------------------------------------------------------------------------
-# Search paths  (desktop + Docker)
+# Prefix paths for OpenCASCADE (macOS, Linux, Docker)
 # ---------------------------------------------------------------------------
 list(APPEND CMAKE_PREFIX_PATH
-     "/opt/homebrew/opt/opencascade"   # macOS / Homebrew
-     "/usr/local")                     # Docker image install prefix
+  "$ENV{HOME}/occt-install/lib/cmake/opencascade"  # Manually built OCCT
+  "/opt/homebrew/opt/opencascade"                  # macOS / Homebrew
+  "/usr/local"                                      # Linux or Docker
+)
 
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
-# Ask for the whole OpenCASCADE package – it will expose the libs that exist
-find_package(OpenCASCADE REQUIRED)     # no COMPONENTS list
-
-# nlohmann/json — optional
+find_package(OpenCASCADE REQUIRED)
 find_package(nlohmann_json QUIET)
 
 # ---------------------------------------------------------------------------
-# Target
+# Executable and sources
 # ---------------------------------------------------------------------------
 add_executable(mcguire_step_cli
   main.cpp
@@ -34,7 +33,7 @@ add_executable(mcguire_step_cli
 )
 
 # ---------------------------------------------------------------------------
-# Include paths & libraries
+# Includes and Linking
 # ---------------------------------------------------------------------------
 target_include_directories(mcguire_step_cli PRIVATE
   include
@@ -47,8 +46,9 @@ target_link_libraries(mcguire_step_cli PRIVATE
 
 if(nlohmann_json_FOUND)
   target_link_libraries(mcguire_step_cli PRIVATE nlohmann_json::nlohmann_json)
+  message(STATUS "Using system nlohmann_json")
 else()
-  message(STATUS "nlohmann_json not found; using vendored header in include/")
+  message(WARNING "nlohmann_json not found; using vendored header in include/nlohmann/json.hpp")
   target_include_directories(mcguire_step_cli PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
